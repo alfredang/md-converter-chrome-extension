@@ -2,6 +2,8 @@
 
 A Chrome extension that converts rich text (HTML) to GitHub Flavored Markdown.
 
+![Preview](preview.png)
+
 ## Features
 
 - **Auto-convert on paste**: Markdown appears instantly when you paste rich text
