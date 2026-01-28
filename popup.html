@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rich Text to Markdown</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Rich Text to Markdown</h1>
+
+    <div class="section">
+      <label for="input">Paste rich text here:</label>
+      <div id="input" class="input-area" contenteditable="true" placeholder="Paste formatted text here (Ctrl/Cmd+V)"></div>
+    </div>
+
+    <div class="section">
+      <div class="output-header">
+        <label for="output">Markdown output:</label>
+        <div class="buttons">
+          <button id="copy-btn" class="btn btn-primary" disabled>Copy Markdown</button>
+          <button id="clear-btn" class="btn btn-secondary">Clear</button>
+        </div>
+      </div>
+      <textarea id="output" class="output-area" readonly placeholder="Markdown will appear here..."></textarea>
+    </div>
+
+    <div id="toast" class="toast">Copied to clipboard!</div>
+  </div>
+
+  <script src="turndown.js"></script>
+  <script src="turndown-plugin-gfm.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
