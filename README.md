@@ -10,7 +10,8 @@ A Chrome extension that converts rich text (HTML) to GitHub Flavored Markdown or
 - **Markdown & HTML output**: Toggle between GitHub Flavored Markdown and clean HTML
 - **GitHub Flavored Markdown**: Supports tables, strikethrough, and task lists
 - **HTML conversion**: Headings, lists, inline code, bold, and italic rendered as semantic HTML
-- **One-click copy**: Copy the output to clipboard in either format
+- **Copy MD & Copy HTML**: Dedicated buttons to copy either format with one click
+- **Persistent data**: Your pasted content and output survive closing and reopening the popup
 - **Clean output**: Compact formatting with no extra blank lines
 
 ## Installation
@@ -52,7 +53,8 @@ Toggle the **"Developer mode"** switch in the top-right corner of the extensions
 3. Paste into the input area (Ctrl/Cmd+V)
 4. Output appears automatically (Markdown by default)
 5. Switch between **Markdown** and **HTML** tabs to toggle output format
-6. Click **"Copy Markdown"** or **"Copy HTML"** to copy the result
+6. Click **"Copy MD"** or **"Copy HTML"** to copy the result
+7. Close and reopen anytime — your data is saved automatically
 
 ## Supported Conversions
 

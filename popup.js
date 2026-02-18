@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('input');
   const output = document.getElementById('output');
-  const copyBtn = document.getElementById('copy-btn');
+  const copyMdBtn = document.getElementById('copy-md-btn');
+  const copyHtmlBtn = document.getElementById('copy-html-btn');
   const clearBtn = document.getElementById('clear-btn');
   const toast = document.getElementById('toast');
   const tabBtns = document.querySelectorAll('.tab-btn');
@@ -153,12 +154,51 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateOutput() {
     if (outputMode === 'html') {
       output.value = currentHTML;
-      copyBtn.textContent = 'Copy HTML';
     } else {
       output.value = currentMarkdown;
-      copyBtn.textContent = 'Copy Markdown';
     }
-    copyBtn.disabled = !output.value;
+    copyMdBtn.disabled = !currentMarkdown;
+    copyHtmlBtn.disabled = !currentHTML;
+  }
+
+  // Save state to chrome.storage.local
+  function saveState() {
+    chrome.storage.local.set({
+      inputHTML: input.innerHTML,
+      currentMarkdown,
+      currentHTML,
+      outputMode,
+    });
+  }
+
+  // Restore state from chrome.storage.local
+  function restoreState() {
+    chrome.storage.local.get(
+      ['inputHTML', 'currentMarkdown', 'currentHTML', 'outputMode'],
+      (result) => {
+        if (result.inputHTML) {
+          input.innerHTML = result.inputHTML;
+        }
+        if (result.currentMarkdown) {
+          currentMarkdown = result.currentMarkdown;
+        }
+        if (result.currentHTML) {
+          currentHTML = result.currentHTML;
+        }
+        if (result.outputMode) {
+          outputMode = result.outputMode;
+          tabBtns.forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.tab === outputMode);
+          });
+        }
+        updateOutput();
+
+        // Focus input only if empty
+        if (!input.innerHTML) {
+          input.focus();
+        }
+      }
+    );
   }
 
   // Tab click handlers
@@ -168,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.classList.add('active');
       outputMode = btn.dataset.tab;
       updateOutput();
+      saveState();
     });
   });
 
@@ -195,6 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
       currentHTML = convertMarkdownToHTML(plainText);
       updateOutput();
     }
+
+    saveState();
   });
 
   // Also handle input changes (for manual typing/editing)
@@ -209,25 +252,45 @@ document.addEventListener('DOMContentLoaded', () => {
       currentMarkdown = '';
       currentHTML = '';
       output.value = '';
-      copyBtn.disabled = true;
+      copyMdBtn.disabled = true;
+      copyHtmlBtn.disabled = true;
     }
+    saveState();
   });
 
-  // Copy button handler
-  copyBtn.addEventListener('click', async () => {
-    const text = output.value;
-    if (!text) return;
-
+  // Copy MD button handler
+  copyMdBtn.addEventListener('click', async () => {
+    if (!currentMarkdown) return;
     try {
-      await navigator.clipboard.writeText(text);
-      showToast(outputMode === 'html' ? 'HTML copied!' : 'Markdown copied!');
+      await navigator.clipboard.writeText(currentMarkdown);
+      showToast('Markdown copied!');
     } catch (err) {
-      // Fallback for older browsers
-      output.select();
-      document.execCommand('copy');
-      showToast(outputMode === 'html' ? 'HTML copied!' : 'Markdown copied!');
+      fallbackCopy(currentMarkdown);
+      showToast('Markdown copied!');
     }
   });
+
+  // Copy HTML button handler
+  copyHtmlBtn.addEventListener('click', async () => {
+    if (!currentHTML) return;
+    try {
+      await navigator.clipboard.writeText(currentHTML);
+      showToast('HTML copied!');
+    } catch (err) {
+      fallbackCopy(currentHTML);
+      showToast('HTML copied!');
+    }
+  });
+
+  // Fallback copy for older browsers
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
 
   // Clear button handler
   clearBtn.addEventListener('click', () => {
@@ -235,8 +298,10 @@ document.addEventListener('DOMContentLoaded', () => {
     output.value = '';
     currentMarkdown = '';
     currentHTML = '';
-    copyBtn.disabled = true;
+    copyMdBtn.disabled = true;
+    copyHtmlBtn.disabled = true;
     input.focus();
+    saveState();
   });
 
   // Toast notification
@@ -248,6 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2000);
   }
 
-  // Focus input on load
-  input.focus();
+  // Restore saved state on load
+  restoreState();
 });

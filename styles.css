@@ -97,7 +97,7 @@ label {
 
 .buttons {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn {
