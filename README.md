@@ -1,14 +1,16 @@
 # Rich Text to Markdown Converter
 
-A Chrome extension that converts rich text (HTML) to GitHub Flavored Markdown.
+A Chrome extension that converts rich text (HTML) to GitHub Flavored Markdown or clean HTML.
 
 ![Preview](preview.png)
 
 ## Features
 
-- **Auto-convert on paste**: Markdown appears instantly when you paste rich text
+- **Auto-convert on paste**: Output appears instantly when you paste rich text
+- **Markdown & HTML output**: Toggle between GitHub Flavored Markdown and clean HTML
 - **GitHub Flavored Markdown**: Supports tables, strikethrough, and task lists
-- **One-click copy**: Copy the markdown output to clipboard
+- **HTML conversion**: Headings, lists, inline code, bold, and italic rendered as semantic HTML
+- **One-click copy**: Copy the output to clipboard in either format
 - **Clean output**: Compact formatting with no extra blank lines
 
 ## Installation
@@ -48,8 +50,9 @@ Toggle the **"Developer mode"** switch in the top-right corner of the extensions
 1. Copy formatted text from any source (Word, Google Docs, web pages, etc.)
 2. Click the extension icon in your Chrome toolbar
 3. Paste into the input area (Ctrl/Cmd+V)
-4. Markdown appears automatically in the output area
-5. Click **"Copy Markdown"** to copy the result
+4. Output appears automatically (Markdown by default)
+5. Switch between **Markdown** and **HTML** tabs to toggle output format
+6. Click **"Copy Markdown"** or **"Copy HTML"** to copy the result
 
 ## Supported Conversions
 

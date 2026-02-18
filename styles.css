@@ -68,6 +68,33 @@ label {
   margin-bottom: 6px;
 }
 
+.output-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #fff;
+  color: #555;
+  transition: all 0.15s ease;
+}
+
+.tab-btn.active {
+  background: #4a90d9;
+  color: #fff;
+  border-color: #4a90d9;
+}
+
+.tab-btn:hover:not(.active) {
+  background: #f0f0f0;
+}
+
 .buttons {
   display: flex;
   gap: 8px;

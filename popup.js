@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const copyBtn = document.getElementById('copy-btn');
   const clearBtn = document.getElementById('clear-btn');
   const toast = document.getElementById('toast');
+  const tabBtns = document.querySelectorAll('.tab-btn');
 
   // Initialize Turndown with GFM plugin
   const turndownService = new TurndownService({
@@ -57,6 +58,119 @@ document.addEventListener('DOMContentLoaded', () => {
     return md.replace(/\n\n+(-|\d+\.)\s/g, '\n$1 ');
   }
 
+  // Convert markdown to clean HTML
+  function convertMarkdownToHTML(markdown) {
+    const lines = markdown.split('\n');
+    const htmlParts = [];
+    let listType = null; // 'ul' or 'ol'
+
+    function escapeHTML(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function processInline(text) {
+      text = escapeHTML(text);
+      // Bold: **text**
+      text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // Italic: _text_
+      text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+      // Inline code: `text`
+      text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+      return text;
+    }
+
+    function closeList() {
+      if (listType) {
+        htmlParts.push(`</${listType}>`);
+        listType = null;
+      }
+    }
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Skip horizontal rules (* * *, ---, ___)
+      if (/^((\* ){2,}\*|(-\s*){3,}|_{3,})$/.test(trimmed)) {
+        continue;
+      }
+
+      // Heading (## or ###, etc.)
+      const headingMatch = trimmed.match(/^#{1,6}\s+(.+)$/);
+      if (headingMatch) {
+        closeList();
+        const headingText = processInline(headingMatch[1]);
+        htmlParts.push(`<p><strong>${headingText}</strong></p>`);
+        continue;
+      }
+
+      // Unordered list item
+      const ulMatch = trimmed.match(/^[-*+]\s+(.+)$/);
+      if (ulMatch) {
+        if (listType !== 'ul') {
+          closeList();
+          htmlParts.push('<ul>');
+          listType = 'ul';
+        }
+        htmlParts.push(`  <li>${processInline(ulMatch[1])}</li>`);
+        continue;
+      }
+
+      // Ordered list item
+      const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+      if (olMatch) {
+        if (listType !== 'ol') {
+          closeList();
+          htmlParts.push('<ol>');
+          listType = 'ol';
+        }
+        htmlParts.push(`  <li>${processInline(olMatch[1])}</li>`);
+        continue;
+      }
+
+      // Empty line — close any open list
+      if (trimmed === '') {
+        closeList();
+        continue;
+      }
+
+      // Regular paragraph
+      closeList();
+      htmlParts.push(`<p>${processInline(trimmed)}</p>`);
+    }
+
+    closeList();
+    return htmlParts.join('\n');
+  }
+
+  // Output mode state
+  let outputMode = 'markdown';
+  let currentMarkdown = '';
+  let currentHTML = '';
+
+  function updateOutput() {
+    if (outputMode === 'html') {
+      output.value = currentHTML;
+      copyBtn.textContent = 'Copy HTML';
+    } else {
+      output.value = currentMarkdown;
+      copyBtn.textContent = 'Copy Markdown';
+    }
+    copyBtn.disabled = !output.value;
+  }
+
+  // Tab click handlers
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      outputMode = btn.dataset.tab;
+      updateOutput();
+    });
+  });
+
   // Handle paste event - auto-convert
   input.addEventListener('paste', (e) => {
     e.preventDefault();
@@ -71,13 +185,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Convert to markdown
       const markdown = turndownService.turndown(html);
-      output.value = compactMarkdown(markdown.trim());
-      copyBtn.disabled = false;
+      currentMarkdown = compactMarkdown(markdown.trim());
+      currentHTML = convertMarkdownToHTML(currentMarkdown);
+      updateOutput();
     } else if (plainText) {
       // If no HTML, just use plain text
       input.textContent = plainText;
-      output.value = plainText;
-      copyBtn.disabled = plainText.length === 0;
+      currentMarkdown = plainText;
+      currentHTML = convertMarkdownToHTML(plainText);
+      updateOutput();
     }
   });
 
@@ -86,9 +202,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const html = input.innerHTML;
     if (html && html !== '<br>') {
       const markdown = turndownService.turndown(html);
-      output.value = compactMarkdown(markdown.trim());
-      copyBtn.disabled = false;
+      currentMarkdown = compactMarkdown(markdown.trim());
+      currentHTML = convertMarkdownToHTML(currentMarkdown);
+      updateOutput();
     } else {
+      currentMarkdown = '';
+      currentHTML = '';
       output.value = '';
       copyBtn.disabled = true;
     }
@@ -96,17 +215,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Copy button handler
   copyBtn.addEventListener('click', async () => {
-    const markdown = output.value;
-    if (!markdown) return;
+    const text = output.value;
+    if (!text) return;
 
     try {
-      await navigator.clipboard.writeText(markdown);
-      showToast('Copied to clipboard!');
+      await navigator.clipboard.writeText(text);
+      showToast(outputMode === 'html' ? 'HTML copied!' : 'Markdown copied!');
     } catch (err) {
       // Fallback for older browsers
       output.select();
       document.execCommand('copy');
-      showToast('Copied to clipboard!');
+      showToast(outputMode === 'html' ? 'HTML copied!' : 'Markdown copied!');
     }
   });
 
@@ -114,6 +233,8 @@ document.addEventListener('DOMContentLoaded', () => {
   clearBtn.addEventListener('click', () => {
     input.innerHTML = '';
     output.value = '';
+    currentMarkdown = '';
+    currentHTML = '';
     copyBtn.disabled = true;
     input.focus();
   });

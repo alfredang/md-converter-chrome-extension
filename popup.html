@@ -17,13 +17,16 @@
 
     <div class="section">
       <div class="output-header">
-        <label for="output">Markdown output:</label>
+        <div class="output-tabs">
+          <button class="tab-btn active" data-tab="markdown">Markdown</button>
+          <button class="tab-btn" data-tab="html">HTML</button>
+        </div>
         <div class="buttons">
           <button id="copy-btn" class="btn btn-primary" disabled>Copy Markdown</button>
           <button id="clear-btn" class="btn btn-secondary">Clear</button>
         </div>
       </div>
-      <textarea id="output" class="output-area" readonly placeholder="Markdown will appear here..."></textarea>
+      <textarea id="output" class="output-area" readonly placeholder="Output will appear here..."></textarea>
     </div>
 
     <div id="toast" class="toast">Copied to clipboard!</div>
