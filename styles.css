@@ -28,18 +28,23 @@ h1 {
   margin-bottom: 16px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
 label {
-  display: block;
   font-size: 13px;
   font-weight: 500;
   color: #555;
-  margin-bottom: 6px;
 }
 
 .input-area {
   width: 100%;
-  min-height: 140px;
-  max-height: 200px;
+  min-height: 160px;
+  max-height: 220px;
   overflow-y: auto;
   padding: 12px;
   border: 1px solid #ddd;
@@ -61,38 +66,24 @@ label {
   pointer-events: none;
 }
 
-.output-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.output-tabs {
-  display: flex;
-  gap: 4px;
-}
-
-.tab-btn {
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
+.markdown-area {
+  width: 100%;
+  height: 180px;
+  padding: 12px;
   border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
+  border-radius: 6px;
   background: #fff;
-  color: #555;
-  transition: all 0.15s ease;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  color: #333;
 }
 
-.tab-btn.active {
-  background: #4a90d9;
-  color: #fff;
+.markdown-area:focus {
+  outline: none;
   border-color: #4a90d9;
-}
-
-.tab-btn:hover:not(.active) {
-  background: #f0f0f0;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
 }
 
 .buttons {
@@ -131,25 +122,6 @@ label {
 
 .btn-secondary:hover:not(:disabled) {
   background: #d0d0d0;
-}
-
-.output-area {
-  width: 100%;
-  height: 180px;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: #fafafa;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  resize: none;
-  color: #333;
-}
-
-.output-area:focus {
-  outline: none;
-  border-color: #4a90d9;
 }
 
 .toast {

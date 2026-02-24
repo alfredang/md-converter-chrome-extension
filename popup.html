@@ -3,31 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rich Text to Markdown</title>
+  <title>Markdown Converter</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="container">
-    <h1>Rich Text to Markdown</h1>
+    <h1>Markdown Converter</h1>
 
     <div class="section">
-      <label for="input">Paste rich text here:</label>
-      <div id="input" class="input-area" contenteditable="true" placeholder="Paste formatted text here (Ctrl/Cmd+V)"></div>
+      <div class="section-header">
+        <label>Rich Text</label>
+      </div>
+      <div id="richtext" class="input-area" contenteditable="true" placeholder="Type or paste rich text here..."></div>
     </div>
 
     <div class="section">
-      <div class="output-header">
-        <div class="output-tabs">
-          <button class="tab-btn active" data-tab="markdown">Markdown</button>
-          <button class="tab-btn" data-tab="html">HTML</button>
-        </div>
+      <div class="section-header">
+        <label>Markdown</label>
         <div class="buttons">
           <button id="copy-md-btn" class="btn btn-primary" disabled>Copy MD</button>
           <button id="copy-html-btn" class="btn btn-primary" disabled>Copy HTML</button>
           <button id="clear-btn" class="btn btn-secondary">Clear</button>
         </div>
       </div>
-      <textarea id="output" class="output-area" readonly placeholder="Output will appear here..."></textarea>
+      <textarea id="markdown" class="markdown-area" placeholder="Type or paste markdown here..."></textarea>
     </div>
 
     <div id="toast" class="toast">Copied to clipboard!</div>

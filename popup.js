@@ -1,11 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('input');
-  const output = document.getElementById('output');
+  const richtext = document.getElementById('richtext');
+  const markdown = document.getElementById('markdown');
   const copyMdBtn = document.getElementById('copy-md-btn');
   const copyHtmlBtn = document.getElementById('copy-html-btn');
   const clearBtn = document.getElementById('clear-btn');
   const toast = document.getElementById('toast');
-  const tabBtns = document.querySelectorAll('.tab-btn');
+
+  // Flag to prevent circular updates
+  let isUpdating = false;
 
   // Initialize Turndown with GFM plugin
   const turndownService = new TurndownService({
@@ -59,11 +61,14 @@ document.addEventListener('DOMContentLoaded', () => {
     return md.replace(/\n\n+(-|\d+\.)\s/g, '\n$1 ');
   }
 
-  // Convert markdown to clean HTML
-  function convertMarkdownToHTML(markdown) {
-    const lines = markdown.split('\n');
+  // Convert markdown to rendered HTML for the rich text panel
+  function convertMarkdownToRenderedHTML(md) {
+    const lines = md.split('\n');
     const htmlParts = [];
-    let listType = null; // 'ul' or 'ol'
+    let listType = null;
+    let inCodeBlock = false;
+    let codeLines = [];
+    let codeLang = '';
 
     function escapeHTML(text) {
       return text
@@ -78,8 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
       text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
       // Italic: _text_
       text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
+      // Strikethrough: ~~text~~
+      text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
       // Inline code: `text`
       text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Links: [text](url)
+      text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+      // Images: ![alt](url)
+      text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
       return text;
     }
 
@@ -93,17 +104,50 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const line of lines) {
       const trimmed = line.trim();
 
-      // Skip horizontal rules (* * *, ---, ___)
-      if (/^((\* ){2,}\*|(-\s*){3,}|_{3,})$/.test(trimmed)) {
+      // Code block fences
+      if (trimmed.startsWith('```')) {
+        if (!inCodeBlock) {
+          closeList();
+          inCodeBlock = true;
+          codeLang = trimmed.slice(3).trim();
+          codeLines = [];
+        } else {
+          const langAttr = codeLang ? ` class="language-${codeLang}"` : '';
+          htmlParts.push(`<pre><code${langAttr}>${escapeHTML(codeLines.join('\n'))}</code></pre>`);
+          inCodeBlock = false;
+          codeLines = [];
+          codeLang = '';
+        }
         continue;
       }
 
-      // Heading (## or ###, etc.)
-      const headingMatch = trimmed.match(/^#{1,6}\s+(.+)$/);
+      if (inCodeBlock) {
+        codeLines.push(line);
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^((\* ){2,}\*|(-\s*){3,}|_{3,})$/.test(trimmed)) {
+        closeList();
+        htmlParts.push('<hr>');
+        continue;
+      }
+
+      // Heading
+      const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
       if (headingMatch) {
         closeList();
-        const headingText = processInline(headingMatch[1]);
-        htmlParts.push(`<p><strong>${headingText}</strong></p>`);
+        const level = headingMatch[1].length;
+        const headingText = processInline(headingMatch[2]);
+        htmlParts.push(`<h${level}>${headingText}</h${level}>`);
+        continue;
+      }
+
+      // Blockquote
+      const blockquoteMatch = trimmed.match(/^>\s*(.*)$/);
+      if (blockquoteMatch) {
+        closeList();
+        htmlParts.push(`<blockquote>${processInline(blockquoteMatch[1])}</blockquote>`);
         continue;
       }
 
@@ -115,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
           htmlParts.push('<ul>');
           listType = 'ul';
         }
-        htmlParts.push(`  <li>${processInline(ulMatch[1])}</li>`);
+        htmlParts.push(`<li>${processInline(ulMatch[1])}</li>`);
         continue;
       }
 
@@ -127,11 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
           htmlParts.push('<ol>');
           listType = 'ol';
         }
-        htmlParts.push(`  <li>${processInline(olMatch[1])}</li>`);
+        htmlParts.push(`<li>${processInline(olMatch[1])}</li>`);
         continue;
       }
 
-      // Empty line — close any open list
+      // Empty line
       if (trimmed === '') {
         closeList();
         continue;
@@ -142,142 +186,123 @@ document.addEventListener('DOMContentLoaded', () => {
       htmlParts.push(`<p>${processInline(trimmed)}</p>`);
     }
 
+    // Close any unclosed code block
+    if (inCodeBlock) {
+      const langAttr = codeLang ? ` class="language-${codeLang}"` : '';
+      htmlParts.push(`<pre><code${langAttr}>${escapeHTML(codeLines.join('\n'))}</code></pre>`);
+    }
+
     closeList();
     return htmlParts.join('\n');
   }
 
-  // Output mode state
-  let outputMode = 'markdown';
-  let currentMarkdown = '';
-  let currentHTML = '';
+  // Convert markdown to clean source HTML (for Copy HTML)
+  function convertMarkdownToSourceHTML(md) {
+    // Reuse the rendered HTML - it's already clean
+    return convertMarkdownToRenderedHTML(md);
+  }
 
-  function updateOutput() {
-    if (outputMode === 'html') {
-      output.value = currentHTML;
+  function updateButtons() {
+    const md = markdown.value.trim();
+    copyMdBtn.disabled = !md;
+    copyHtmlBtn.disabled = !md;
+  }
+
+  // --- Rich Text → Markdown ---
+  function onRichTextChange() {
+    if (isUpdating) return;
+    isUpdating = true;
+
+    const html = richtext.innerHTML;
+    if (html && html !== '<br>' && html !== '<div><br></div>') {
+      const md = turndownService.turndown(html);
+      markdown.value = compactMarkdown(md.trim());
     } else {
-      output.value = currentMarkdown;
+      markdown.value = '';
     }
-    copyMdBtn.disabled = !currentMarkdown;
-    copyHtmlBtn.disabled = !currentHTML;
+
+    updateButtons();
+    saveState();
+    isUpdating = false;
   }
 
-  // Save state to chrome.storage.local
-  function saveState() {
-    chrome.storage.local.set({
-      inputHTML: input.innerHTML,
-      currentMarkdown,
-      currentHTML,
-      outputMode,
-    });
+  // --- Markdown → Rich Text ---
+  function onMarkdownChange() {
+    if (isUpdating) return;
+    isUpdating = true;
+
+    const md = markdown.value;
+    if (md.trim()) {
+      richtext.innerHTML = convertMarkdownToRenderedHTML(md);
+    } else {
+      richtext.innerHTML = '';
+    }
+
+    updateButtons();
+    saveState();
+    isUpdating = false;
   }
 
-  // Restore state from chrome.storage.local
-  function restoreState() {
-    chrome.storage.local.get(
-      ['inputHTML', 'currentMarkdown', 'currentHTML', 'outputMode'],
-      (result) => {
-        if (result.inputHTML) {
-          input.innerHTML = result.inputHTML;
-        }
-        if (result.currentMarkdown) {
-          currentMarkdown = result.currentMarkdown;
-        }
-        if (result.currentHTML) {
-          currentHTML = result.currentHTML;
-        }
-        if (result.outputMode) {
-          outputMode = result.outputMode;
-          tabBtns.forEach((btn) => {
-            btn.classList.toggle('active', btn.dataset.tab === outputMode);
-          });
-        }
-        updateOutput();
-
-        // Focus input only if empty
-        if (!input.innerHTML) {
-          input.focus();
-        }
-      }
-    );
-  }
-
-  // Tab click handlers
-  tabBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      tabBtns.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      outputMode = btn.dataset.tab;
-      updateOutput();
-      saveState();
-    });
-  });
-
-  // Handle paste event - auto-convert
-  input.addEventListener('paste', (e) => {
+  // Handle paste in rich text area
+  richtext.addEventListener('paste', (e) => {
     e.preventDefault();
 
-    // Get HTML content from clipboard
     const html = e.clipboardData.getData('text/html');
     const plainText = e.clipboardData.getData('text/plain');
 
     if (html) {
-      // Display the rich text in input area
-      input.innerHTML = html;
-
-      // Convert to markdown
-      const markdown = turndownService.turndown(html);
-      currentMarkdown = compactMarkdown(markdown.trim());
-      currentHTML = convertMarkdownToHTML(currentMarkdown);
-      updateOutput();
+      richtext.innerHTML = html;
     } else if (plainText) {
-      // If no HTML, just use plain text
-      input.textContent = plainText;
-      currentMarkdown = plainText;
-      currentHTML = convertMarkdownToHTML(plainText);
-      updateOutput();
+      richtext.textContent = plainText;
     }
 
-    saveState();
+    onRichTextChange();
   });
 
-  // Also handle input changes (for manual typing/editing)
-  input.addEventListener('input', () => {
-    const html = input.innerHTML;
-    if (html && html !== '<br>') {
-      const markdown = turndownService.turndown(html);
-      currentMarkdown = compactMarkdown(markdown.trim());
-      currentHTML = convertMarkdownToHTML(currentMarkdown);
-      updateOutput();
-    } else {
-      currentMarkdown = '';
-      currentHTML = '';
-      output.value = '';
-      copyMdBtn.disabled = true;
-      copyHtmlBtn.disabled = true;
-    }
-    saveState();
+  // Handle input in rich text area
+  richtext.addEventListener('input', () => {
+    onRichTextChange();
+  });
+
+  // Handle input in markdown area
+  markdown.addEventListener('input', () => {
+    onMarkdownChange();
+  });
+
+  // Handle paste in markdown area (treat as plain text)
+  markdown.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    const start = markdown.selectionStart;
+    const end = markdown.selectionEnd;
+    markdown.value = markdown.value.substring(0, start) + text + markdown.value.substring(end);
+    markdown.selectionStart = markdown.selectionEnd = start + text.length;
+    onMarkdownChange();
   });
 
   // Copy MD button handler
   copyMdBtn.addEventListener('click', async () => {
-    if (!currentMarkdown) return;
+    const md = markdown.value.trim();
+    if (!md) return;
     try {
-      await navigator.clipboard.writeText(currentMarkdown);
+      await navigator.clipboard.writeText(md);
       showToast('Markdown copied!');
     } catch (err) {
-      fallbackCopy(currentMarkdown);
+      fallbackCopy(md);
       showToast('Markdown copied!');
     }
   });
 
   // Copy HTML button handler
   copyHtmlBtn.addEventListener('click', async () => {
-    if (!currentHTML) return;
+    const md = markdown.value.trim();
+    if (!md) return;
+    const html = convertMarkdownToSourceHTML(md);
     try {
-      await navigator.clipboard.writeText(currentHTML);
+      await navigator.clipboard.writeText(html);
       showToast('HTML copied!');
     } catch (err) {
-      fallbackCopy(currentHTML);
+      fallbackCopy(html);
       showToast('HTML copied!');
     }
   });
@@ -294,15 +319,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Clear button handler
   clearBtn.addEventListener('click', () => {
-    input.innerHTML = '';
-    output.value = '';
-    currentMarkdown = '';
-    currentHTML = '';
+    richtext.innerHTML = '';
+    markdown.value = '';
     copyMdBtn.disabled = true;
     copyHtmlBtn.disabled = true;
-    input.focus();
+    richtext.focus();
     saveState();
   });
+
+  // Save state to chrome.storage.local
+  function saveState() {
+    chrome.storage.local.set({
+      richTextHTML: richtext.innerHTML,
+      markdownText: markdown.value,
+    });
+  }
+
+  // Restore state from chrome.storage.local
+  function restoreState() {
+    chrome.storage.local.get(['richTextHTML', 'markdownText'], (result) => {
+      if (result.markdownText) {
+        markdown.value = result.markdownText;
+      }
+      if (result.richTextHTML) {
+        richtext.innerHTML = result.richTextHTML;
+      }
+      updateButtons();
+
+      if (!richtext.innerHTML && !markdown.value) {
+        richtext.focus();
+      }
+    });
+  }
 
   // Toast notification
   function showToast(message) {
