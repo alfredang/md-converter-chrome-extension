@@ -35,6 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   });
 
+  // Strip blockquote markers — render as plain text
+  turndownService.addRule('blockquote', {
+    filter: 'blockquote',
+    replacement: (content) => {
+      return '\n' + content.trim() + '\n';
+    },
+  });
+
   // Custom rule for compact list items (no extra blank lines)
   turndownService.addRule('listItem', {
     filter: 'li',
@@ -140,14 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const level = headingMatch[1].length;
         const headingText = processInline(headingMatch[2]);
         htmlParts.push(`<h${level}>${headingText}</h${level}>`);
-        continue;
-      }
-
-      // Blockquote
-      const blockquoteMatch = trimmed.match(/^>\s*(.*)$/);
-      if (blockquoteMatch) {
-        closeList();
-        htmlParts.push(`<blockquote>${processInline(blockquoteMatch[1])}</blockquote>`);
         continue;
       }
 
