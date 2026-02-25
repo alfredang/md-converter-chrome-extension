@@ -1,13 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
   const richtext = document.getElementById('richtext');
-  const markdown = document.getElementById('markdown');
+  const output = document.getElementById('output');
   const copyMdBtn = document.getElementById('copy-md-btn');
   const copyHtmlBtn = document.getElementById('copy-html-btn');
   const clearBtn = document.getElementById('clear-btn');
   const toast = document.getElementById('toast');
+  const tabBtns = document.querySelectorAll('.tab-btn');
 
   // Flag to prevent circular updates
   let isUpdating = false;
+  let outputMode = 'markdown'; // 'markdown' or 'html'
+  let currentMarkdown = '';
+  let currentHTML = '';
 
   // Initialize Turndown with GFM plugin
   const turndownService = new TurndownService({
@@ -17,6 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
     emDelimiter: '_',
     strongDelimiter: '**',
   });
+
+  // Disable Turndown's escaping so literal >, *, _ etc. are not backslash-escaped
+  turndownService.escape = (str) => str;
 
   // Use GFM plugin for tables, strikethrough, and task lists
   turndownService.use(turndownPluginGfm.gfm);
@@ -69,8 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return md.replace(/\n\n+(-|\d+\.)\s/g, '\n$1 ');
   }
 
-  // Convert markdown to rendered HTML for the rich text panel
-  function convertMarkdownToRenderedHTML(md) {
+  // Convert markdown to rendered HTML
+  function convertMarkdownToHTML(md) {
     const lines = md.split('\n');
     const htmlParts = [];
     let listType = null;
@@ -87,17 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function processInline(text) {
       text = escapeHTML(text);
-      // Bold: **text**
       text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      // Italic: _text_
       text = text.replace(/_([^_]+)_/g, '<em>$1</em>');
-      // Strikethrough: ~~text~~
       text = text.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-      // Inline code: `text`
       text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-      // Links: [text](url)
       text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-      // Images: ![alt](url)
       text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
       return text;
     }
@@ -196,16 +197,18 @@ document.addEventListener('DOMContentLoaded', () => {
     return htmlParts.join('\n');
   }
 
-  // Convert markdown to clean source HTML (for Copy HTML)
-  function convertMarkdownToSourceHTML(md) {
-    // Reuse the rendered HTML - it's already clean
-    return convertMarkdownToRenderedHTML(md);
-  }
-
-  function updateButtons() {
-    const md = markdown.value.trim();
-    copyMdBtn.disabled = !md;
-    copyHtmlBtn.disabled = !md;
+  function updateOutput() {
+    if (outputMode === 'html') {
+      output.value = currentHTML;
+      output.readOnly = true;
+      output.placeholder = 'HTML output will appear here...';
+    } else {
+      output.value = currentMarkdown;
+      output.readOnly = false;
+      output.placeholder = 'Type or paste markdown here...';
+    }
+    copyMdBtn.disabled = !currentMarkdown;
+    copyHtmlBtn.disabled = !currentHTML;
   }
 
   // --- Rich Text → Markdown ---
@@ -216,12 +219,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const html = richtext.innerHTML;
     if (html && html !== '<br>' && html !== '<div><br></div>') {
       const md = turndownService.turndown(html);
-      markdown.value = compactMarkdown(md.trim());
+      currentMarkdown = compactMarkdown(md.trim());
+      currentHTML = convertMarkdownToHTML(currentMarkdown);
     } else {
-      markdown.value = '';
+      currentMarkdown = '';
+      currentHTML = '';
     }
 
-    updateButtons();
+    updateOutput();
     saveState();
     isUpdating = false;
   }
@@ -231,17 +236,31 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isUpdating) return;
     isUpdating = true;
 
-    const md = markdown.value;
+    const md = output.value;
+    currentMarkdown = md;
     if (md.trim()) {
-      richtext.innerHTML = convertMarkdownToRenderedHTML(md);
+      currentHTML = convertMarkdownToHTML(md);
+      richtext.innerHTML = currentHTML;
     } else {
+      currentHTML = '';
       richtext.innerHTML = '';
     }
 
-    updateButtons();
+    updateOutput();
     saveState();
     isUpdating = false;
   }
+
+  // Tab click handlers
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      outputMode = btn.dataset.tab;
+      updateOutput();
+      saveState();
+    });
+  });
 
   // Handle paste in rich text area
   richtext.addEventListener('paste', (e) => {
@@ -264,45 +283,45 @@ document.addEventListener('DOMContentLoaded', () => {
     onRichTextChange();
   });
 
-  // Handle input in markdown area
-  markdown.addEventListener('input', () => {
-    onMarkdownChange();
+  // Handle input in output area (only when in markdown mode)
+  output.addEventListener('input', () => {
+    if (outputMode === 'markdown') {
+      onMarkdownChange();
+    }
   });
 
-  // Handle paste in markdown area (treat as plain text)
-  markdown.addEventListener('paste', (e) => {
+  // Handle paste in output area (plain text only, markdown mode)
+  output.addEventListener('paste', (e) => {
+    if (outputMode !== 'markdown') return;
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
-    const start = markdown.selectionStart;
-    const end = markdown.selectionEnd;
-    markdown.value = markdown.value.substring(0, start) + text + markdown.value.substring(end);
-    markdown.selectionStart = markdown.selectionEnd = start + text.length;
+    const start = output.selectionStart;
+    const end = output.selectionEnd;
+    output.value = output.value.substring(0, start) + text + output.value.substring(end);
+    output.selectionStart = output.selectionEnd = start + text.length;
     onMarkdownChange();
   });
 
   // Copy MD button handler
   copyMdBtn.addEventListener('click', async () => {
-    const md = markdown.value.trim();
-    if (!md) return;
+    if (!currentMarkdown) return;
     try {
-      await navigator.clipboard.writeText(md);
+      await navigator.clipboard.writeText(currentMarkdown);
       showToast('Markdown copied!');
     } catch (err) {
-      fallbackCopy(md);
+      fallbackCopy(currentMarkdown);
       showToast('Markdown copied!');
     }
   });
 
   // Copy HTML button handler
   copyHtmlBtn.addEventListener('click', async () => {
-    const md = markdown.value.trim();
-    if (!md) return;
-    const html = convertMarkdownToSourceHTML(md);
+    if (!currentHTML) return;
     try {
-      await navigator.clipboard.writeText(html);
+      await navigator.clipboard.writeText(currentHTML);
       showToast('HTML copied!');
     } catch (err) {
-      fallbackCopy(html);
+      fallbackCopy(currentHTML);
       showToast('HTML copied!');
     }
   });
@@ -320,9 +339,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Clear button handler
   clearBtn.addEventListener('click', () => {
     richtext.innerHTML = '';
-    markdown.value = '';
-    copyMdBtn.disabled = true;
-    copyHtmlBtn.disabled = true;
+    currentMarkdown = '';
+    currentHTML = '';
+    updateOutput();
     richtext.focus();
     saveState();
   });
@@ -331,25 +350,39 @@ document.addEventListener('DOMContentLoaded', () => {
   function saveState() {
     chrome.storage.local.set({
       richTextHTML: richtext.innerHTML,
-      markdownText: markdown.value,
+      currentMarkdown,
+      currentHTML,
+      outputMode,
     });
   }
 
   // Restore state from chrome.storage.local
   function restoreState() {
-    chrome.storage.local.get(['richTextHTML', 'markdownText'], (result) => {
-      if (result.markdownText) {
-        markdown.value = result.markdownText;
-      }
-      if (result.richTextHTML) {
-        richtext.innerHTML = result.richTextHTML;
-      }
-      updateButtons();
+    chrome.storage.local.get(
+      ['richTextHTML', 'currentMarkdown', 'currentHTML', 'outputMode'],
+      (result) => {
+        if (result.currentMarkdown) {
+          currentMarkdown = result.currentMarkdown;
+        }
+        if (result.currentHTML) {
+          currentHTML = result.currentHTML;
+        }
+        if (result.richTextHTML) {
+          richtext.innerHTML = result.richTextHTML;
+        }
+        if (result.outputMode) {
+          outputMode = result.outputMode;
+          tabBtns.forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.tab === outputMode);
+          });
+        }
+        updateOutput();
 
-      if (!richtext.innerHTML && !markdown.value) {
-        richtext.focus();
+        if (!richtext.innerHTML && !currentMarkdown) {
+          richtext.focus();
+        }
       }
-    });
+    );
   }
 
   // Toast notification
